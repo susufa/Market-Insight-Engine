@@ -1,0 +1,70 @@
+# ============================================================
+#  .gitignore – Market Insight Engine
+# ============================================================
+
+# --- Sensitive configuration ---
+.env
+.env.*
+!.env.example
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.pyd
+*.pyo
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+site-packages/
+
+# --- Virtual Environments ---
+.venv/
+venv/
+env/
+
+# --- Test & Coverage Reports ---
+reports/
+.coverage
+htmlcov/
+.pytest_cache/
+
+# --- Mypy / Ruff Cache ---
+.mypy_cache/
+.ruff_cache/
+
+# --- Local Data (never commit raw financial data) ---
+data/raw/
+data/staging/
+data/production/
+data/quarantine/
+data/*.db
+data/*.db-shm
+data/*.db-wal
+
+# --- Logs ---
+logs/
+*.log
+
+# --- Model weights & artifacts ---
+src/models/weights/
+*.pt
+*.pth
+*.pkl
+*.joblib
+
+# --- Frontend build artifacts ---
+web/node_modules/
+web/dist/
+web/.vite/
+
+# --- IDE & OS ---
+.idea/
+.vscode/
+*.swp
+*.swo
+Thumbs.db
+.DS_Store
+desktop.ini
