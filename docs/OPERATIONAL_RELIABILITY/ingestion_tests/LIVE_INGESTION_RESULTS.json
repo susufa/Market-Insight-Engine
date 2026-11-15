@@ -1,0 +1,84 @@
+{
+  "health_check": true,
+  "test_timestamp": "2026-11-14T08:52:58.824185+00:00",
+  "results": {
+    "600519.SH": [
+      {
+        "trial": 1,
+        "symbol": "600519.SH",
+        "status": "SUCCESS",
+        "bars_count": 21,
+        "first_bar_date": "2023-12-01",
+        "last_bar_date": "2023-12-29",
+        "first_close": 1760.28,
+        "last_close": 1726.0,
+        "elapsed_sec": 8.459,
+        "source_id": "akshare"
+      },
+      {
+        "trial": 2,
+        "symbol": "600519.SH",
+        "status": "SUCCESS",
+        "bars_count": 21,
+        "first_bar_date": "2023-12-01",
+        "last_bar_date": "2023-12-29",
+        "first_close": 1760.28,
+        "last_close": 1726.0,
+        "elapsed_sec": 18.114,
+        "source_id": "akshare"
+      }
+    ],
+    "000001.SZ": [
+      {
+        "trial": 1,
+        "symbol": "000001.SZ",
+        "status": "SUCCESS",
+        "bars_count": 21,
+        "first_bar_date": "2023-12-01",
+        "last_bar_date": "2023-12-29",
+        "first_close": 9.66,
+        "last_close": 9.39,
+        "elapsed_sec": 7.397,
+        "source_id": "akshare"
+      },
+      {
+        "trial": 2,
+        "symbol": "000001.SZ",
+        "status": "SUCCESS",
+        "bars_count": 21,
+        "first_bar_date": "2023-12-01",
+        "last_bar_date": "2023-12-29",
+        "first_close": 9.66,
+        "last_close": 9.39,
+        "elapsed_sec": 15.125,
+        "source_id": "akshare"
+      }
+    ],
+    "000333.SZ": [
+      {
+        "trial": 1,
+        "symbol": "000333.SZ",
+        "status": "SUCCESS",
+        "bars_count": 21,
+        "first_bar_date": "2023-12-01",
+        "last_bar_date": "2023-12-29",
+        "first_close": 50.55,
+        "last_close": 54.63,
+        "elapsed_sec": 15.183,
+        "source_id": "akshare"
+      },
+      {
+        "trial": 2,
+        "symbol": "000333.SZ",
+        "status": "SUCCESS",
+        "bars_count": 21,
+        "first_bar_date": "2023-12-01",
+        "last_bar_date": "2023-12-29",
+        "first_close": 50.55,
+        "last_close": 54.63,
+        "elapsed_sec": 17.9,
+        "source_id": "akshare"
+      }
+    ]
+  }
+}
