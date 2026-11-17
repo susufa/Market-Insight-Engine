@@ -1,87 +1,161 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Header } from './components/Header';
-import { StockHeader } from './components/StockHeader';
-import { StockChart } from './components/StockChart';
-import { SecondaryTabs } from './components/SecondaryTabs';
-import { DataUpdateModal } from './components/DataUpdateModal';
-import { TaskMonitorDrawer } from './components/TaskMonitorDrawer';
-import {
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { TopBar } from './components/TopBar';
+import { QuoteBoard } from './components/QuoteBoard';
+import { ChartWorkspace } from './components/ChartWorkspace';
+import { ContextRail } from './components/ContextRail';
+import { InsightDock } from './components/InsightDock';
+import { DataUpdateDialog } from './components/DataUpdateDialog';
+import { TaskDrawer } from './components/TaskDrawer';
+import type {
+  AdjustType,
+  BreadthReport,
   ColorScheme,
-  IndexTicker,
+  HealthState,
+  IndexQuote,
+  IndicatorRow,
+  ModelEvaluationSummary,
+  PredictionResult,
   QuoteResponse,
+  RelativePerformance,
+  SectorSummary,
   Security,
   Timeframe,
-  AdjustType,
-  IndicatorRow,
-  BreadthReport,
-  SectorSummary,
-  RelativePerformance,
-  PredictionResult,
-  ModelEvaluationSummary,
 } from './types';
 import {
   fetchBars,
-  fetchQuote,
-  fetchSecurities,
+  fetchForecast,
+  fetchHealth,
   fetchIndicators,
   fetchMarketBreadth,
-  fetchSectors,
+  fetchQuote,
   fetchRelativePerformance,
-  fetchForecast,
+  fetchSectors,
+  fetchSecurities,
   fetchWalkForwardReport,
 } from './api';
+import { useDisplayProfile } from './hooks/useDisplay';
+import { fmtClock } from './lib/format';
 
-// Static benchmark reference indices (labeled clearly as reference to avoid misleading real-time representation)
-const DEFAULT_INDICES: IndexTicker[] = [
-  { symbol: '000001.SH', name: '上证指数(基准)', price: 3088.24, change: 16.42, pct_change: 0.54 },
-  { symbol: '399001.SZ', name: '深证成指(基准)', price: 9872.15, change: 82.30, pct_change: 0.84 },
-  { symbol: '399006.SZ', name: '创业板指(基准)', price: 1945.80, change: 21.15, pct_change: 1.10 },
-  { symbol: 'HSI.HK', name: '恒生指数(基准)', price: 17855.20, change: -45.10, pct_change: -0.25 },
+const INDEX_DEFS: Array<{ symbol: string; label: string }> = [
+  { symbol: '000001.SH', label: '上证指数' },
+  { symbol: '399001.SZ', label: '深证成指' },
+  { symbol: '399006.SZ', label: '创业板指' },
+  { symbol: 'HSI.HK', label: '恒生指数' },
 ];
 
+const COLOR_KEY = 'mie.colorScheme';
+
+function readColorScheme(): ColorScheme {
+  try {
+    return localStorage.getItem(COLOR_KEY) === 'INTL' ? 'INTL' : 'CN';
+  } catch {
+    return 'CN';
+  }
+}
+
 export const App: React.FC = () => {
-  const [selectedSymbol, setSelectedSymbol] = useState<string>('600519.SH');
+  const [selectedSymbol, setSelectedSymbol] = useState('600519.SH');
   const [timeframe, setTimeframe] = useState<Timeframe>('1d');
   const [adjType, setAdjType] = useState<AdjustType>('none');
-  const [colorScheme, setColorScheme] = useState<ColorScheme>('CN');
+  const [colorScheme, setColorScheme] = useState<ColorScheme>(readColorScheme);
 
   const [securities, setSecurities] = useState<Security[]>([]);
   const [quote, setQuote] = useState<QuoteResponse | null>(null);
-  const [indicatorBars, setIndicatorBars] = useState<IndicatorRow[]>([]);
+  const [bars, setBars] = useState<IndicatorRow[]>([]);
   const [breadth, setBreadth] = useState<BreadthReport | null>(null);
   const [sectors, setSectors] = useState<SectorSummary[]>([]);
-  const [relativePerf, setRelativePerf] = useState<RelativePerformance | null>(null);
+  const [relative, setRelative] = useState<RelativePerformance | null>(null);
   const [prediction, setPrediction] = useState<PredictionResult | null>(null);
-  const [walkForwardSummary, setWalkForwardSummary] = useState<ModelEvaluationSummary | null>(null);
+  const [walkForward, setWalkForward] = useState<ModelEvaluationSummary | null>(null);
 
-  const [isCached, setIsCached] = useState<boolean>(false);
-  const [qualityStatus, setQualityStatus] = useState<string>('PASS');
-  const [sourceId, setSourceId] = useState<string>('local_store');
-  const [dataOrigin, setDataOrigin] = useState<string>('real_provider');
-  const [sourceInterface, setSourceInterface] = useState<string>('');
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [qualityStatus, setQualityStatus] = useState('NO_DATA');
+  const [isCached, setIsCached] = useState(false);
+  const [dataOrigin, setDataOrigin] = useState('unknown');
+  const [sourceInterface, setSourceInterface] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [lastLoadedAt, setLastLoadedAt] = useState<string | null>(null);
 
-  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState<boolean>(false);
-  const [isTaskMonitorOpen, setIsTaskMonitorOpen] = useState<boolean>(false);
+  const [indices, setIndices] = useState<IndexQuote[]>(
+    INDEX_DEFS.map((d) => ({ ...d, price: null, pct: null })),
+  );
+  const [health, setHealth] = useState<HealthState>('checking');
+
+  const [updateOpen, setUpdateOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
 
-  // Load securities list once on mount
+  const [pageRatio, setPageRatio] = useState(1);
+  const display = useDisplayProfile();
+  const requestId = useRef(0);
+
+  const security = securities.find((s) => s.symbol === selectedSymbol);
+  const latestIndicator = bars.length > 0 ? bars[bars.length - 1] : null;
+  const viewKey = selectedSymbol + ':' + timeframe + ':' + adjType;
+
+  /* ---- colour scheme persistence -------------------------------------- */
   useEffect(() => {
-    fetchSecurities().then((res) => {
-      if (res && res.items) {
-        setSecurities(res.items);
-      }
+    try {
+      localStorage.setItem(COLOR_KEY, colorScheme);
+    } catch {
+      /* private mode */
+    }
+  }, [colorScheme]);
+
+  /* ---- one-off catalogue & macro -------------------------------------- */
+  useEffect(() => {
+    let alive = true;
+    fetchSecurities(undefined, undefined, 500).then((res) => {
+      if (alive) setSecurities(res.items ?? []);
     });
+    fetchMarketBreadth('CN_A').then((data) => {
+      if (alive) setBreadth(data);
+    });
+    fetchSectors('000001.SH').then((data) => {
+      if (alive) setSectors(data);
+    });
+    return () => {
+      alive = false;
+    };
   }, []);
 
-  // Load macro statistics (breadth & sectors) once on mount
+  /* ---- health probe ---------------------------------------------------- */
+  const probeHealth = useCallback(async () => {
+    const res = await fetchHealth();
+    setHealth(res ? 'live' : 'offline');
+  }, []);
+
   useEffect(() => {
-    fetchMarketBreadth('CN_A').then((b) => setBreadth(b)).catch(() => {});
-    fetchSectors('000001.SH').then((s) => setSectors(s)).catch(() => {});
+    void probeHealth();
+    const timer = window.setInterval(() => {
+      void probeHealth();
+    }, 30000);
+    return () => window.clearInterval(timer);
+  }, [probeHealth]);
+
+  /* ---- index strip ----------------------------------------------------- */
+  const loadIndices = useCallback(async () => {
+    const results = await Promise.allSettled(INDEX_DEFS.map((d) => fetchQuote(d.symbol)));
+    setIndices(
+      INDEX_DEFS.map((def, i) => {
+        const result = results[i];
+        const q = result.status === 'fulfilled' ? result.value : null;
+        return {
+          ...def,
+          price: q?.last_price ?? null,
+          pct: q?.pct_change ?? null,
+          asOf: q?.ts ?? null,
+        };
+      }),
+    );
   }, []);
 
-  // Load quote, indicator-enriched bars, and relative performance
-  const loadMarketData = useCallback(async () => {
+  useEffect(() => {
+    void loadIndices();
+  }, [loadIndices]);
+
+  /* ---- instrument market data ----------------------------------------- */
+  const loadMarket = useCallback(async () => {
+    const ticket = ++requestId.current;
     setIsLoading(true);
     try {
       const [quoteRes, indRes, perfRes, predRes, wfRes] = await Promise.all([
@@ -92,139 +166,188 @@ export const App: React.FC = () => {
         fetchWalkForwardReport(selectedSymbol),
       ]);
 
-      setQuote(quoteRes);
-      if (quoteRes?.data_origin) {
-        setDataOrigin(quoteRes.data_origin);
-      }
-      if (quoteRes?.source_interface) {
-        setSourceInterface(quoteRes.source_interface);
-      }
+      if (ticket !== requestId.current) return;
 
-      if (indRes && indRes.rows && indRes.rows.length > 0) {
-        setIndicatorBars(indRes.rows);
+      setQuote(quoteRes);
+      setDataOrigin(quoteRes?.data_origin ?? 'unknown');
+      setSourceInterface(quoteRes?.source_interface ?? '');
+
+      if (indRes && indRes.rows.length > 0) {
+        setBars(indRes.rows);
         setIsCached(indRes.is_cached);
         setQualityStatus('PASS');
-        setSourceId('analysis_engine');
       } else {
-        // Fallback to fetchBars if indicators endpoint returns empty
-        const barsRes = await fetchBars(selectedSymbol, timeframe, adjType);
-        if (barsRes && barsRes.bars && barsRes.bars.length > 0) {
-          setIndicatorBars(barsRes.bars);
-          setIsCached(barsRes.is_cached);
-          setQualityStatus(barsRes.data_quality_status || 'PASS');
-          setSourceId(barsRes.source_id || 'local_store');
-          if (barsRes.data_origin) setDataOrigin(barsRes.data_origin);
-          if (barsRes.source_interface) setSourceInterface(barsRes.source_interface);
-        } else {
-          setIndicatorBars([]);
-          setIsCached(false);
-          setQualityStatus(barsRes.data_quality_status || 'NO_DATA');
-          setSourceId(barsRes.source_id || 'local_store');
-          setDataOrigin(barsRes.data_origin || 'unknown');
-          setSourceInterface(barsRes.source_interface || '');
-        }
+        const fallback = await fetchBars(selectedSymbol, timeframe, adjType);
+        if (ticket !== requestId.current) return;
+        setBars(fallback.bars as IndicatorRow[]);
+        setIsCached(fallback.is_cached);
+        setQualityStatus(fallback.data_quality_status);
+        if (fallback.data_origin) setDataOrigin(fallback.data_origin);
+        if (fallback.source_interface) setSourceInterface(fallback.source_interface);
       }
-      setRelativePerf(perfRes);
+
+      setRelative(perfRes);
       setPrediction(predRes);
-      setWalkForwardSummary(wfRes);
+      setWalkForward(wfRes);
+      setLastLoadedAt(new Date().toISOString());
     } catch (err) {
-      console.error('Failed to load market data:', err);
+      console.warn('market data load failed', err);
     } finally {
-      setIsLoading(false);
+      if (ticket === requestId.current) setIsLoading(false);
     }
   }, [selectedSymbol, timeframe, adjType]);
 
   useEffect(() => {
-    loadMarketData();
-  }, [loadMarketData]);
+    void loadMarket();
+  }, [loadMarket]);
 
-  const currentSecurity = securities.find((s) => s.symbol === selectedSymbol);
-  const latestIndicator = indicatorBars.length > 0 ? indicatorBars[indicatorBars.length - 1] : null;
+  const refreshAll = useCallback(() => {
+    void loadMarket();
+    void loadIndices();
+    void probeHealth();
+    void fetchMarketBreadth('CN_A').then(setBreadth);
+    void fetchSectors('000001.SH').then(setSectors);
+  }, [loadMarket, loadIndices, probeHealth]);
+
+  /* ---- honest page-height gauge (target ≤ 1.5 screens) ---------------- */
+  useEffect(() => {
+    const measure = () => {
+      const doc = document.documentElement;
+      const ratio = doc.scrollHeight / Math.max(1, window.innerHeight);
+      setPageRatio(Math.round(Math.min(9.99, ratio) * 100) / 100);
+    };
+    measure();
+    const timer = window.setTimeout(measure, 240);
+    window.addEventListener('resize', measure);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener('resize', measure);
+    };
+  }, [isLoading, drawerOpen, updateOpen]);
+
+  const onTaskCompleted = useCallback(() => {
+    void loadMarket();
+    void loadIndices();
+  }, [loadMarket, loadIndices]);
 
   return (
-    <div className="min-h-screen bg-warm-50 flex flex-col font-sans text-warm-800">
-      {/* 1. Global Navigation Bar */}
-      <Header
-        indices={DEFAULT_INDICES}
+    <div className="app-shell">
+      <TopBar
+        indices={indices}
         securities={securities}
         selectedSymbol={selectedSymbol}
         onSelectSymbol={setSelectedSymbol}
-        colorScheme={colorScheme}
+        health={health}
+        isRefreshing={isLoading}
+        onRefresh={refreshAll}
       />
 
-      {/* 2. Security Summary & Quote Bar */}
-      <StockHeader
-        security={currentSecurity}
+      <QuoteBoard
+        security={security}
         quote={quote}
         colorScheme={colorScheme}
         isCached={isCached}
         qualityStatus={qualityStatus}
-        sourceId={sourceId}
         dataOrigin={dataOrigin}
         sourceInterface={sourceInterface}
-        onRefresh={loadMarketData}
         isLoading={isLoading}
-        onOpenUpdateModal={() => setIsUpdateModalOpen(true)}
-        onOpenTaskMonitor={() => setIsTaskMonitorOpen(true)}
-        activeTaskCount={activeTaskId ? 1 : 0}
+        activeTaskCount={activeTaskId || drawerOpen ? 1 : 0}
+        onOpenUpdate={() => setUpdateOpen(true)}
+        onOpenMonitor={() => setDrawerOpen(true)}
+        onRefresh={loadMarket}
       />
 
-      {/* 3. Main Chart & Toolbars (Adaptive width up to 4K, height bounded within viewports) */}
-      <main className="flex-1 w-full max-w-[2560px] 2xl:max-w-[3400px] mx-auto px-2 sm:px-4 lg:px-6 py-2">
-        <StockChart
-          bars={indicatorBars}
-          timeframe={timeframe}
-          adjType={adjType}
-          colorScheme={colorScheme}
-          onTimeframeChange={setTimeframe}
-          onAdjTypeChange={setAdjType}
-          onColorSchemeChange={setColorScheme}
-          isLoading={isLoading}
-        />
+      <main className="flex min-h-0 flex-1 flex-col">
+        <div className="shell-bleed workspace">
+          <ChartWorkspace
+            bars={bars}
+            timeframe={timeframe}
+            adjType={adjType}
+            colorScheme={colorScheme}
+            symbol={selectedSymbol}
+            qualityStatus={qualityStatus}
+            isLoading={isLoading}
+            viewKey={viewKey}
+            onTimeframeChange={setTimeframe}
+            onAdjTypeChange={setAdjType}
+            onColorSchemeChange={setColorScheme}
+          />
 
-        {/* 4. Secondary Information & Governance Tabs */}
-        <div className="mt-2">
-          <SecondaryTabs
+          <ContextRail
             quote={quote}
-            security={currentSecurity}
-            breadth={breadth}
-            sectors={sectors}
-            relativePerformance={relativePerf}
+            security={security}
+            bars={bars}
             latestIndicator={latestIndicator}
             prediction={prediction}
-            walkForwardSummary={walkForwardSummary}
+            colorScheme={colorScheme}
+            qualityStatus={qualityStatus}
+            isCached={isCached}
+            dataOrigin={dataOrigin}
+            sourceInterface={sourceInterface}
           />
         </div>
       </main>
 
-      {/* 5. Minimal Footer */}
-      <footer className="bg-white border-t border-warm-200 py-1.5 px-3 sm:px-4 lg:px-6 text-center text-[11px] text-warm-400 font-mono">
-        <div className="w-full max-w-[2560px] 2xl:max-w-[3400px] mx-auto flex flex-wrap items-center justify-between gap-1">
-          <span>Market Insight Engine (MIE) · 阶段七：模块化行情数据获取系统与更新编排</span>
-          <span>高DPI与全分辨率自适应 · 计算内核: Polars Vectorized · 架构: React 19 + Canvas + FastAPI</span>
+      <InsightDock
+        quote={quote}
+        security={security}
+        breadth={breadth}
+        sectors={sectors}
+        relative={relative}
+        latestIndicator={latestIndicator}
+        prediction={prediction}
+        walkForward={walkForward}
+        colorScheme={colorScheme}
+        qualityStatus={qualityStatus}
+        isCached={isCached}
+        dataOrigin={dataOrigin}
+        sourceInterface={sourceInterface}
+        totalBars={bars.length}
+      />
+
+      <footer className="statusbar">
+        <div className="statusbar__group">
+          <span className="flex items-center gap-1.5">
+            <span className={'led ' + (health === 'live' ? 'led--live' : health === 'checking' ? 'led--warn' : 'led--off')} />
+            MIE · beta 0.1.0
+          </span>
+          <span className="statusbar__sep" />
+          <span className="hidden sm:inline">本地优先 · FastAPI / Polars / Parquet</span>
+          <span className="statusbar__sep hidden sm:inline" />
+          <span className="hidden lg:inline">前端重构 · 暖纸终端</span>
+        </div>
+
+        <div className="statusbar__group">
+          <span className="hidden md:inline">同步 {lastLoadedAt ? fmtClock(lastLoadedAt) : '—'}</span>
+          <span className="statusbar__sep hidden md:inline" />
+          <span>
+            {display.width}×{display.height}
+          </span>
+          <span className="statusbar__sep" />
+          <span>DPR {display.dpr.toFixed(2)}</span>
+          <span className="statusbar__sep" />
+          <span className={pageRatio > 1.5 ? 'text-market-red' : undefined}>
+            页面 {pageRatio.toFixed(2)}× 视口
+          </span>
         </div>
       </footer>
 
-      {/* 6. Active Data Acquisition & Updating Modal */}
-      <DataUpdateModal
-        isOpen={isUpdateModalOpen}
-        onClose={() => setIsUpdateModalOpen(false)}
+      <DataUpdateDialog
+        isOpen={updateOpen}
+        onClose={() => setUpdateOpen(false)}
         currentSymbol={selectedSymbol}
-        onTaskCreated={(tid) => {
-          setActiveTaskId(tid);
-          setIsTaskMonitorOpen(true);
+        onTaskCreated={(taskId) => {
+          setActiveTaskId(taskId);
+          setDrawerOpen(true);
         }}
       />
 
-      {/* 7. Task Monitor & Heartbeat Drawer */}
-      <TaskMonitorDrawer
-        isOpen={isTaskMonitorOpen}
-        onClose={() => setIsTaskMonitorOpen(false)}
+      <TaskDrawer
+        isOpen={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
         activeTaskId={activeTaskId}
         onSelectTaskId={setActiveTaskId}
-        onTaskCompleted={() => {
-          loadMarketData();
-        }}
+        onTaskCompleted={onTaskCompleted}
       />
     </div>
   );

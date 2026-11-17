@@ -6,9 +6,9 @@
   <img src="https://img.shields.io/badge/Polars-1.12%2B-CD792C?logo=polars&logoColor=white" alt="Polars">
   <img src="https://img.shields.io/badge/DuckDB-OLAP-FFF000?logo=duckdb&logoColor=black" alt="DuckDB">
   <img src="https://img.shields.io/badge/SQLite-WAL%20ACID-003B57?logo=sqlite&logoColor=white" alt="SQLite WAL">
-  <img src="https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black" alt="React 18">
+  <img src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black" alt="React 19">
   <img src="https://img.shields.io/badge/TypeScript-5.6%2B-3178C6?logo=typescript&logoColor=white" alt="TypeScript">
-  <img src="https://img.shields.io/badge/Vite-5.4%2B-646CFF?logo=vite&logoColor=white" alt="Vite">
+  <img src="https://img.shields.io/badge/Vite-8%2B-646CFF?logo=vite&logoColor=white" alt="Vite 8">
   <img src="https://img.shields.io/badge/Tests-185%20Passed-brightgreen" alt="Tests">
   <img src="https://img.shields.io/badge/Coverage-81%25-green" alt="Coverage">
   <img src="https://img.shields.io/badge/License-Proprietary-red" alt="License">
@@ -37,8 +37,10 @@
   - 基于 DuckDB 提供极速高并发 OLAP 跨表分析查询；
   - 采用 SQLite WAL 模式管理元数据覆盖范围与数据版本审计。
 - **交互式 Web 前端与任务监控抽屉**:
-  - 基于 React 18 + Vite + TypeScript 构建的高性能单页应用；
-  - 提供交互式行情更新弹窗（`DataUpdateModal`）与实时任务运行抽屉（`TaskMonitorDrawer`），支持进度条、心跳脉冲与断点恢复交互。
+  - 基于 React 19 + Vite + TypeScript 构建的单屏行情终端（暖纸配色、发丝线排版、等宽数字），整页高度严格控制在 1.5 个视口以内；
+  - 自绘 Canvas K 线：DPR 物理像素背板、价格轴/末价/十字光标标签、MA/EMA/BOLL 叠加与 VOL/MACD/RSI/KDJ/ATR 副图；
+  - 提供交互式行情更新弹窗（`DataUpdateDialog`）与实时任务运行抽屉（`TaskDrawer`），支持进度环、心跳脉冲与断点恢复交互；
+  - 设计与实测详见 `docs/FRONTEND_REBUILD_V2.md`。
 
 ---
 
@@ -108,9 +110,8 @@ Market_Insight_Engine/
 │   │   ├── DATA_ACQUISITION_ARCHITECTURE.md
 │   │   └── DATA_ACQUISITION_MODULE_DESIGN.md
 │   └── ...
-├── scripts/                    # 运维支持、压测与多分辨率自动化脚本
+├── scripts/                    # 运维支持与压测脚本
 │   ├── benchmark_resource_usage.py # 存储引擎资源基准压测
-│   ├── test_responsive.cjs     # Puppeteer 10 种分辨率响应式测试
 │   └── ...
 ├── src/                        # 后端核心源码
 │   ├── acquisition/            # [Step7] 模块化行情获取与调度引擎
@@ -138,9 +139,9 @@ Market_Insight_Engine/
 │   ├── conftest.py
 │   ├── integration/            # 集成测试 (CLI、API、任务持久化、心跳与断点)
 │   └── unit/                   # 单元测试 (成交量换算、Mock 隔离、调度器等)
-├── web/                        # 前端 React 18 + TypeScript 工程
+├── web/                        # 前端 React 19 + TypeScript 工程
 │   ├── src/                    # 前端组件、视图、API 与状态模型
-│   │   ├── components/         # DataUpdateModal, TaskMonitorDrawer 等
+│   │   ├── components/         # TopBar / QuoteBoard / ChartWorkspace / InsightDock 等
 │   │   ├── api.ts              # REST API 客户端
 │   │   └── types.ts            # 前端 TypeScript 接口定义
 │   ├── index.html              # HTML 模板
@@ -150,8 +151,8 @@ Market_Insight_Engine/
 ├── .env.example                # 环境变量配置模板
 ├── .gitignore                  # Git 忽略规则文件
 ├── pyproject.toml              # Python 构建配置、依赖、Ruff 与 Mypy 规则
-├── README.md                   # 项目核心说明文档 (当前文件)
-└── v0.70.md                    # V0.70 正式发布日志与技术报告
+├── 报告.md                      # 部署与模型预测功能完整验证报告
+└── README.md                   # 项目核心说明文档 (当前文件)
 ```
 
 ---
@@ -193,24 +194,39 @@ cd web
 # 1. 安装 npm 依赖
 npm install
 
-# 2. 编译生产构建产物
+# 2. 编译生产构建产物（输出至 web/dist/，由 FastAPI 静态托管）
 npm run build
+cd ..
 
-# （可选）启动前端本地热重载开发服务器
-npm run dev
+# （可选）启动前端本地热重载开发服务器（默认监听端口 3000）
+# npm run dev
 ```
 
-### 4. 启动服务 (Running the Application)
+### 4. 初始行情同步 (Cold-Start Ingestion)
+
+系统遵循零数据泄露原则（不向代码仓库提交行情数据与数据库文件）。在初次启动 Web 终端前，建议同步初始基准与股票行情（如贵州茅台与上证指数）：
+
+```bash
+# 1. 检查数据源可用性
+python -m src.acquisition.cli health
+
+# 2. 同步初始标的历史行情数据
+python -m src.acquisition.cli fetch --symbol 600519.SH --timeframe 1d --start 2021-01-01 --end 2024-12-31
+python -m src.acquisition.cli fetch --symbol 000001.SH --timeframe 1d --start 2021-01-01 --end 2024-12-31
+```
+
+### 5. 启动服务 (Running the Application)
 
 在项目根目录下启动 FastAPI 主后端服务：
 
 ```bash
 # 启动 API 服务（默认监听端口 8000）
-uvicorn src.api.app:app --host 0.0.0.0 --port 8000 --reload
+uvicorn src.api.app:app --host 127.0.0.1 --port 8000 --reload
 ```
 
-- **交互式 API 文档 (Swagger UI)**: [http://localhost:8000/docs](http://localhost:8000/docs)
-- **Web 前端应用**: [http://localhost:8000](http://localhost:8000)（或 Vite 开发服务器 [http://localhost:5173](http://localhost:5173)）
+- **Web 前端应用**: [http://127.0.0.1:8000/ui/](http://127.0.0.1:8000/ui/)（访问根路径 [http://127.0.0.1:8000](http://127.0.0.1:8000) 自动跳转，或 Vite 开发服务器 [http://localhost:3000](http://localhost:3000)）
+- **交互式 API 文档 (Swagger UI)**: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+- **系统健康探测**: [http://127.0.0.1:8000/api/v1/system/health](http://127.0.0.1:8000/api/v1/system/health)
 
 ---
 
@@ -272,9 +288,6 @@ ruff format --check src tests
 
 # 4. 严格静态类型检查 (Mypy)
 mypy src/acquisition src/api/v1/acquisition.py --follow-imports=silent
-
-# 5. 前端多分辨率响应式自动化回归测试（10 种分辨率配置）
-node scripts/test_responsive.cjs
 ```
 
 ---

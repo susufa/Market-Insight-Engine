@@ -4,6 +4,9 @@ import tailwindcss from '@tailwindcss/vite'
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  // Relative base keeps the same build working both on the Vite dev server and
+  // behind FastAPI's StaticFiles mount at /ui.
+  base: './',
   plugins: [
     react(),
     tailwindcss(),

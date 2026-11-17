@@ -20,10 +20,12 @@ build/
 .eggs/
 site-packages/
 
-# --- Virtual Environments ---
+# --- Virtual Environments & Local Cache ---
 .venv/
 venv/
 env/
+.cache/
+web/.npm-cache/
 
 # --- Test & Coverage Reports ---
 reports/
@@ -35,14 +37,8 @@ htmlcov/
 .mypy_cache/
 .ruff_cache/
 
-# --- Local Data (never commit raw financial data) ---
-data/raw/
-data/staging/
-data/production/
-data/quarantine/
-data/*.db
-data/*.db-shm
-data/*.db-wal
+# --- Local Data & model artifacts (never commit) ---
+data/
 
 # --- Logs ---
 logs/
@@ -59,6 +55,11 @@ src/models/weights/
 web/node_modules/
 web/dist/
 web/.vite/
+
+# --- Local QA artifacts (browser screenshots / fixtures) ---
+docs/FRONTEND_V2/
+docs/STEP5_RESPONSIVE_TESTS/
+*.screen.png
 
 # --- IDE & OS ---
 .idea/

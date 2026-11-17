@@ -6,9 +6,9 @@
   <img src="https://img.shields.io/badge/Polars-1.12%2B-CD792C?logo=polars&logoColor=white" alt="Polars">
   <img src="https://img.shields.io/badge/DuckDB-OLAP-FFF000?logo=duckdb&logoColor=black" alt="DuckDB">
   <img src="https://img.shields.io/badge/SQLite-WAL%20ACID-003B57?logo=sqlite&logoColor=white" alt="SQLite WAL">
-  <img src="https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black" alt="React 18">
+  <img src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black" alt="React 19">
   <img src="https://img.shields.io/badge/TypeScript-5.6%2B-3178C6?logo=typescript&logoColor=white" alt="TypeScript">
-  <img src="https://img.shields.io/badge/Vite-5.4%2B-646CFF?logo=vite&logoColor=white" alt="Vite">
+  <img src="https://img.shields.io/badge/Vite-8%2B-646CFF?logo=vite&logoColor=white" alt="Vite 8">
   <img src="https://img.shields.io/badge/Tests-185%20Passed-brightgreen" alt="Tests">
   <img src="https://img.shields.io/badge/Coverage-81%25-green" alt="Coverage">
   <img src="https://img.shields.io/badge/License-Proprietary-red" alt="License">
@@ -54,9 +54,11 @@ Quantitative financial engineering frequently suffers from upstream data contami
 
 * **Interactive High-DPI Web UI**:
 
-  * Built with React, TypeScript, and HTML5 Canvas for adaptive rendering from 1024×768 laptops up to 4K displays.
+  * Single-screen market terminal built with React 19, TypeScript and a hand-drawn Canvas engine: warm-paper palette, hairline typography, tabular numerals, total page height capped at 1.5 viewports.
 
-  * Includes an interactive `DataUpdateModal` and a real-time `TaskMonitorDrawer` displaying live heartbeats, progress bars, and one-click breakpoint resumption.
+  * Fluid root font-size (clamp 12.5→20px) plus a DPR-aware canvas backing store keeps the UI readable and razor sharp from 1024×768 laptops to 4K displays, including 125%/150%/200% system scaling.
+
+  * Includes an interactive `DataUpdateDialog` and a real-time `TaskDrawer` displaying live heartbeats, progress rings, and one-click breakpoint resumption. Design notes: `docs/FRONTEND_REBUILD_V2.md`.
 
 ## 🏛️ System Architecture
 
@@ -119,11 +121,10 @@ Market_Insight_Engine/
 │   ├── OPERATIONAL_RELIABILITY/# 24 operational reliability test suites
 │   ├── STEP7/                  # Modular data acquisition architecture & design specs
 │   └── ...
-├── scripts/                    # Operations, benchmarking & responsive UI test scripts
+├── scripts/                    # Operations & benchmarking scripts
 │   ├── benchmark_resource_usage.py
 │   ├── inspect_meta_db.py
-│   ├── inspect_parquet_volumes.py
-│   └── test_responsive.cjs     # Puppeteer 10-viewport responsive verification
+│   └── inspect_parquet_volumes.py
 ├── src/                        # Backend Python source code
 │   ├── acquisition/            # [Step 7] Modular market data acquisition & scheduling
 │   │   ├── base.py             # Entities: RawProviderResponse, VolumeUnit, etc.
@@ -147,9 +148,9 @@ Market_Insight_Engine/
 │   ├── conftest.py
 │   ├── integration/            # CLI, API, task persistence, heartbeat & recovery tests
 │   └── unit/                   # Volume normalization, mock isolation, indicators & ML tests
-├── web/                        # Frontend React + TypeScript application
+├── web/                        # Frontend React 19 + TypeScript application
 │   ├── src/
-│   │   ├── components/         # Header, StockHeader, StockChart, SecondaryTabs, Modals
+│   │   ├── components/         # TopBar, QuoteBoard, ChartWorkspace, ContextRail, InsightDock, TaskDrawer, DataUpdateDialog
 │   │   ├── api.ts              # Typed REST API client
 │   │   └── types.ts            # Frontend TypeScript interfaces
 │   ├── index.html
@@ -159,6 +160,7 @@ Market_Insight_Engine/
 ├── .env.example                # Environment variable template
 ├── .gitignore                  # Git ignore rules (excludes raw/production data & caches)
 ├── pyproject.toml              # Python packaging, dependencies, Ruff & Mypy config
+├── 报告.md                      # Deployment and model verification report
 └── README.md                   # Project documentation
 
 ```
@@ -204,15 +206,30 @@ cd web
 # 1. Install npm dependencies
 npm install
 
-# 2. Build production static assets (outputs to web/dist/)
+# 2. Build production static assets (outputs to web/dist/, mounted by FastAPI)
 npm run build
+cd ..
 
-# (Optional) Start Vite local development server with hot reload
-npm run dev
+# (Optional) Start Vite local development server with hot reload (default port 3000)
+# npm run dev
 
 ```
 
-### 4. Running the Application
+### 4. Initial Data Ingestion (Cold Start)
+
+Because historical market data is excluded from Git (zero data-leakage hygiene rule), fetch initial bars for benchmark and securities before launching the web UI:
+
+```
+# 1. Probe connectivity across data providers
+python -m src.acquisition.cli health
+
+# 2. Ingest initial historical bars
+python -m src.acquisition.cli fetch --symbol 600519.SH --timeframe 1d --start 2021-01-01 --end 2024-12-31
+python -m src.acquisition.cli fetch --symbol 000001.SH --timeframe 1d --start 2021-01-01 --end 2024-12-31
+
+```
+
+### 5. Running the Application
 
 From the project root directory, launch the FastAPI server:
 
@@ -221,7 +238,7 @@ uvicorn src.api.app:app --host 127.0.0.1 --port 8000 --reload
 
 ```
 
-* **Web Application UI**: `http://127.0.0.1:8000/ui/` (or `http://localhost:5173` via Vite dev server)
+* **Web Application UI**: `http://127.0.0.1:8000/ui/` (or root `http://127.0.0.1:8000/` with auto-redirect, or `http://localhost:3000` via Vite dev server)
 
 * **Interactive API Docs (Swagger UI)**: `http://127.0.0.1:8000/docs` (enabled in `development` mode)
 
@@ -290,10 +307,6 @@ ruff format --check src tests
 
 # 4. Run strict static type checking via Mypy
 mypy src/acquisition src/api/v1/acquisition.py --follow-imports=silent
-
-# 5. Run automated multi-resolution responsive UI tests (10 viewports)
-node scripts/test_responsive.cjs
-
 ```
 
 ## ⚙️ Configuration Reference

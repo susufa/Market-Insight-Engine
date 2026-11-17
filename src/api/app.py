@@ -113,7 +113,10 @@ def create_app() -> FastAPI:
     app.include_router(acquisition_router, prefix="/api/v1")
 
     @app.get("/", include_in_schema=False)
-    async def root() -> dict[str, str]:
+    async def root():
+        if web_dist.exists():
+            from fastapi.responses import RedirectResponse
+            return RedirectResponse(url="/ui/")
         return {"service": "Market Insight Engine", "version": "0.10.0", "status": "ok"}
 
     web_dist = Path(__file__).resolve().parent.parent.parent / "web" / "dist"

@@ -249,3 +249,13 @@ export interface ModelCatalogItem {
   type: string;
   description: string;
 }
+
+export interface IndexQuote {
+  symbol: string;
+  label: string;
+  price: number | null;
+  pct: number | null;
+  asOf?: string | null;
+}
+
+export type HealthState = 'checking' | 'live' | 'offline';

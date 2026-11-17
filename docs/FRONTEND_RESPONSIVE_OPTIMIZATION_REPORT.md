@@ -1,5 +1,10 @@
 # MIE_V0.50 — 前端多分辨率与窗口自适应专项审查与优化报告
 
+> **历史文档说明**：本文描述的是 V0.50 时期的 Header / StockChart / SecondaryTabs 实现。
+> beta_ver 已整体重写前端（单屏终端布局、页面高度 ≤ 1.5 视口、流式字号 + DPR 背板），
+> 最新设计与实测数据见 [FRONTEND_REBUILD_V2.md](./FRONTEND_REBUILD_V2.md)。
+> 文中提到的响应式验收脚本与截图属于本地 QA 产物，未随仓库提交。
+
 **文档标识**：`MIE-FRONTEND-RESPONSIVE-V0.50`  
 **完成时间**：2026-11-14  
 **所属阶段**：第一阶段：前端窗口适配审查与优化  
@@ -70,7 +75,7 @@
 ## 四、真实浏览器测试环境与测试矩阵
 
 - **浏览器内核**：Google Chrome 132.0.6834.111 / Puppeteer-Core
-- **测试执行命令**：`node scripts/test_responsive.cjs`
+- **测试执行命令**：`node scripts/test_responsive.cjs`（历史本地验收脚本，未随仓库提交）
 - **控制台错误检查**：`consoleErrors: 0`（完全零错误）
 
 ### 自动化多分辨率实测数据表

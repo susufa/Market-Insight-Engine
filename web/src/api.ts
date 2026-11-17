@@ -19,6 +19,17 @@ const MARKET_BASE = '/api/v1/market';
 const ANALYSIS_BASE = '/api/v1/analysis';
 const PREDICTION_BASE = '/api/v1/prediction';
 const ACQUISITION_BASE = '/api/v1/acquisition';
+const SYSTEM_BASE = '/api/v1/system';
+
+export async function fetchHealth(): Promise<{ status: string; version: string } | null> {
+  try {
+    const res = await fetch(SYSTEM_BASE + '/health');
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
 
 export async function fetchSecurities(
   market?: string,

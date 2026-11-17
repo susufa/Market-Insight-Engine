@@ -47,12 +47,20 @@ class Settings(BaseSettings):
     @field_validator("data_root", mode="before")
     @classmethod
     def resolve_data_root(cls, v: str | Path) -> Path:
-        return Path(v).expanduser().resolve()
+        p = Path(v).expanduser()
+        if not p.is_absolute():
+            project_root = Path(__file__).resolve().parent.parent
+            return (project_root / p).resolve()
+        return p.resolve()
 
     @property
     def meta_db(self) -> Path:
         if self.meta_db_path:
-            return self.meta_db_path.expanduser().resolve()
+            p = self.meta_db_path.expanduser()
+            if not p.is_absolute():
+                project_root = Path(__file__).resolve().parent.parent
+                return (project_root / p).resolve()
+            return p.resolve()
         return self.data_root / "meta.db"
 
     @property

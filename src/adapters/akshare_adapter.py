@@ -206,8 +206,13 @@ class AKShareAdapter(BaseDataSourceAdapter):
             import akshare as ak
 
             # Try a lightweight query
+            check_fn = getattr(
+                ak, "calendar_trade_date_hist_sina", getattr(ak, "tool_trade_date_hist_sina", None)
+            )
+            if check_fn is None:
+                return False
             df = await self._execute_with_retry(
-                ak.tool_trade_date_hist_sina,
+                check_fn,
             )
             return df is not None and not df.empty
         except Exception as exc:
@@ -365,10 +370,14 @@ class AKShareAdapter(BaseDataSourceAdapter):
                 )
             else:
                 # Default to A-share: Try primary EastMoney; on outage/limit, failover to Sina daily
+                em_fn = getattr(ak, "stock_zh_a_hist_em", getattr(ak, "stock_zh_a_hist", None))
+                sina_fn = getattr(ak, "stock_zh_a_hist_sina", getattr(ak, "stock_zh_a_daily", None))
                 try:
                     source_interface = "akshare:stock_zh_a_hist"
+                    if em_fn is None:
+                        raise DataSourceUnavailableError(self.source_id, "EastMoney hist function not found")
                     df = await self._execute_with_retry(
-                        ak.stock_zh_a_hist,
+                        em_fn,
                         symbol=code,
                         period="daily",
                         start_date=start_str,
@@ -390,8 +399,10 @@ class AKShareAdapter(BaseDataSourceAdapter):
                     source_interface = "akshare:stock_zh_a_daily"
                     is_sh = exchange == "SH" or code.startswith("6")
                     sina_code = f"sh{code}" if is_sh else f"sz{code}"
+                    if sina_fn is None:
+                        raise DataSourceUnavailableError(self.source_id, "Sina hist function not found")
                     df = await self._execute_with_retry(
-                        ak.stock_zh_a_daily,
+                        sina_fn,
                         symbol=sina_code,
                         adjust="",
                     )
