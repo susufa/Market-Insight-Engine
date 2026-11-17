@@ -105,11 +105,7 @@ Market_Insight_Engine/
 │   ├── logging_config.py       # 结构化日志输出格式
 │   └── settings.py             # 基于 Pydantic 的环境变量管理
 ├── docs/                       # 核心技术设计文档与测试集
-│   ├── OPERATIONAL_RELIABILITY/# 运营可靠性测试集（24 项）
-│   ├── STEP7/                  # Step7 架构设计与模块设计规范
-│   │   ├── DATA_ACQUISITION_ARCHITECTURE.md
-│   │   └── DATA_ACQUISITION_MODULE_DESIGN.md
-│   └── ...
+│   └── OPERATIONAL_RELIABILITY/# 运营可靠性测试集（24 项）  
 ├── scripts/                    # 运维支持与压测脚本
 │   ├── benchmark_resource_usage.py # 存储引擎资源基准压测
 │   └── ...

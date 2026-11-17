@@ -118,9 +118,7 @@ Market_Insight_Engine/
 │   ├── logging_config.py       # Structured console & rotating file logging
 │   └── settings.py             # Pydantic BaseSettings environment management
 ├── docs/                       # Architecture specifications & verification reports
-│   ├── OPERATIONAL_RELIABILITY/# 24 operational reliability test suites
-│   ├── STEP7/                  # Modular data acquisition architecture & design specs
-│   └── ...
+│   └── OPERATIONAL_RELIABILITY/# 24 operational reliability test suites
 ├── scripts/                    # Operations & benchmarking scripts
 │   ├── benchmark_resource_usage.py
 │   ├── inspect_meta_db.py
